@@ -122,6 +122,9 @@ namespace Raytracing
 
             switch(accelerationStructure)
             {
+                case Accelerator.UniformGrid:
+                    accelerator = new UniformGrid(ref scene.objects);
+                    break;
                 case Accelerator.None:
                 default:
                     accelerator = new Accelerator(ref scene.objects);
@@ -629,6 +632,15 @@ namespace Raytracing
             defaultFilename += "&resolution=" + factorWidth + "x" + factorHeight;
             defaultFilename += "&aliasing=" + antiAliasing;
 
+            string acceleratorName = Accelerator.Types[acceleratorType].ToLower();
+            acceleratorName = acceleratorName.Replace(' ', '_');
+            defaultFilename += "&structure=" + acceleratorName;
+
+            if(Accelerator.Types[acceleratorType] == Accelerator.UniformGrid)
+            {
+                defaultFilename += "&grid_multiplier=" + gridMultiplier;
+            }
+
             string path = EditorUtility.SaveFilePanelInProject("Save Image", defaultFilename, "png", "", Application.dataPath + "/Renderings");
 
             if (!string.IsNullOrEmpty(path))
@@ -707,6 +719,10 @@ namespace Raytracing
 
             EditorGUILayout.Space();
             raytracer.acceleratorType = EditorGUILayout.Popup("Acceleration Structure", raytracer.acceleratorType, Accelerator.Types);
+            if(Accelerator.Types[raytracer.acceleratorType] == Accelerator.UniformGrid)
+            {
+                Raytracer.gridMultiplier = EditorGUILayout.IntSlider("Grid Multiplier", Raytracer.gridMultiplier, 0, 4);
+            }
 
             EditorGUILayout.Space();
             raytracer.overrideSettings = EditorGUILayout.Toggle("Override Settings", raytracer.overrideSettings);
