@@ -74,7 +74,8 @@ namespace Raytracing
         public bool isRunning, isCompleted;
 
         public int rayCount;
-        private int maxRayCount;
+        private int screenRayCount;
+        private int maxScreenRayCount;
 
         private bool runThread;
 
@@ -182,7 +183,8 @@ namespace Raytracing
             runThread = true;
 
             rayCount = 0;
-            maxRayCount = factorWidth * factorHeight;
+            screenRayCount = 0;
+            maxScreenRayCount = factorWidth * factorHeight;
             dofAperture_inv = 1 / dofAperture;
 
             BuildAccelerator();
@@ -303,7 +305,7 @@ namespace Raytracing
             int y = pixel / factorWidth;
 
             pixels[pixel] = TraceRay(x, y);
-            rayCount++;
+            screenRayCount++;
         }
 
         Color TraceRaySimple(float x, float y)
@@ -422,7 +424,7 @@ namespace Raytracing
             {
                 return Color.black;
             }
-
+            
             RayHit hitInfo = new RayHit();
 
             bool hit = Raycast(ray, ref hitInfo);
@@ -513,7 +515,7 @@ namespace Raytracing
 
                         if(sin > 0)
                         {
-                            rayCount++;
+                            screenRayCount++;
 
                             float cosT = Mathf.Sqrt(1 - sin);
 
@@ -577,6 +579,11 @@ namespace Raytracing
 
         bool Raycast(Ray ray, ref RayHit hitInfo)
         {
+            lock(this)
+            {
+                rayCount++;
+            }
+
             return accelerator.Hit(ray, ref hitInfo);
         }
 
@@ -639,7 +646,7 @@ namespace Raytracing
 
         public float GetFinishedPercentage()
         {
-            return (float)rayCount / maxRayCount;
+            return (float)screenRayCount / maxScreenRayCount;
         }
 
         public void StopRayTracer()
