@@ -17,7 +17,8 @@ namespace Raytracing
                     {
                         vertexMin[i] = vertex[i];
                     }
-                    else if (vertex[i] > vertexMax[i])
+
+                    if (vertex[i] > vertexMax[i])
                     {
                         vertexMax[i] = vertex[i];
                     }
