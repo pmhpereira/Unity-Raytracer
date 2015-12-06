@@ -5,10 +5,12 @@ namespace Raytracing
     public class Accelerator
     {
         public const string None = "None";
+        public const string UniformGrid = "Uniform Grid";
 
         public static readonly string[]  Types = new string[]
         {
-            None
+            None,
+            UniformGrid
         };
 
         protected List<Object> objects;
