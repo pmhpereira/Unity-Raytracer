@@ -308,7 +308,10 @@ namespace Raytracing
             int y = pixel / factorWidth;
 
             pixels[pixel] = TraceRay(x, y);
-            screenRayCount++;
+            lock(this)
+            {
+                screenRayCount++;
+            }
         }
 
         Color TraceRaySimple(float x, float y)
@@ -592,7 +595,7 @@ namespace Raytracing
 
         IEnumerator Refresh()
         {
-            if(pixels != null)
+            if(image != null && pixels != null)
             {
                 image.SetPixels(pixels);
                 image.Apply();
@@ -612,7 +615,7 @@ namespace Raytracing
 
         void OnGUI()
         {
-            if (raytracerThread != null)
+            if (image != null && raytracerThread != null)
             {
                 GUI.DrawTexture(new Rect(0, 0, width, height), image);
             }
@@ -626,10 +629,21 @@ namespace Raytracing
 
             if (!string.IsNullOrEmpty(path))
             {
-                scene = new Scene();
+                ResetScene();
+
                 scene.Load(path);
                 filename = Path.GetFileName(path);
             }
+        }
+
+        public void ResetScene()
+        {
+            scene = new Scene();
+
+            startTime = endTime = 0;
+            rayCount = screenRayCount = maxScreenRayCount = 0;
+
+            image = null;
         }
 
         public void SaveImage()
@@ -649,7 +663,12 @@ namespace Raytracing
 
         public float GetFinishedPercentage()
         {
-            return (float)screenRayCount / maxScreenRayCount;
+            if(maxScreenRayCount > 0)
+            {
+                return (float)screenRayCount / maxScreenRayCount;
+            }
+
+            return 0;
         }
 
         public void StopRayTracer()
@@ -658,7 +677,7 @@ namespace Raytracing
             runThread = false;
 
             isRunning = false;
-            isCompleted = true;
+            isCompleted = (screenRayCount == maxScreenRayCount);
         }
 
         void OnDestroy()
@@ -789,7 +808,7 @@ namespace Raytracing
 
                 statsString += "Time: " + time.ToString("n2") + "s";
 
-                if (raytracer.isRunning)
+                if (raytracer.scene.objects.Count > 0)
                 {
                     statsString += " ";
                     statsString += "(" + (raytracer.GetFinishedPercentage() * 100).ToString("n2") + "%)";
