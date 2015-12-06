@@ -89,7 +89,7 @@ namespace Raytracing
         public int acceleratorType;
         public int antiAliasingType;
 
-        public static int gridMultiplier;
+        public static float gridMultiplier;
 
         public string filename;
 
@@ -632,15 +632,6 @@ namespace Raytracing
             defaultFilename += "&resolution=" + factorWidth + "x" + factorHeight;
             defaultFilename += "&aliasing=" + antiAliasing;
 
-            string acceleratorName = Accelerator.Types[acceleratorType].ToLower();
-            acceleratorName = acceleratorName.Replace(' ', '_');
-            defaultFilename += "&structure=" + acceleratorName;
-
-            if(Accelerator.Types[acceleratorType] == Accelerator.UniformGrid)
-            {
-                defaultFilename += "&grid_multiplier=" + gridMultiplier;
-            }
-
             string path = EditorUtility.SaveFilePanelInProject("Save Image", defaultFilename, "png", "", Application.dataPath + "/Renderings");
 
             if (!string.IsNullOrEmpty(path))
@@ -721,7 +712,7 @@ namespace Raytracing
             raytracer.acceleratorType = EditorGUILayout.Popup("Acceleration Structure", raytracer.acceleratorType, Accelerator.Types);
             if(Accelerator.Types[raytracer.acceleratorType] == Accelerator.UniformGrid)
             {
-                Raytracer.gridMultiplier = EditorGUILayout.IntSlider("Grid Multiplier", Raytracer.gridMultiplier, 0, 4);
+                Raytracer.gridMultiplier = EditorGUILayout.Slider("Grid Multiplier", Raytracer.gridMultiplier, 0, 4);
             }
 
             EditorGUILayout.Space();
