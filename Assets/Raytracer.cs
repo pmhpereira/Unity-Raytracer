@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Collections;
 using System;
+using System.Text;
 
 namespace Raytracing
 {
@@ -92,7 +93,7 @@ namespace Raytracing
 
         public static float gridMultiplier;
 
-        public string filename;
+        public string sceneFilename;
 
         public bool hasLighting;
 
@@ -632,7 +633,7 @@ namespace Raytracing
                 ResetScene();
 
                 scene.Load(path);
-                filename = Path.GetFileName(path);
+                sceneFilename = Path.GetFileName(path);
             }
         }
 
@@ -648,17 +649,81 @@ namespace Raytracing
 
         public void SaveImage()
         {
-            string defaultFilename = filename.Split('.')[0];
-            defaultFilename += "&depth=" + recursionDepth;
-            defaultFilename += "&resolution=" + factorWidth + "x" + factorHeight;
-            defaultFilename += "&aliasing=" + antiAliasing;
+            string defaultDirectory = Application.dataPath + "/Renderings";
+            string defaultFilename = sceneFilename.Split('.')[0];
+            string fileExtension = "png";
 
-            string path = EditorUtility.SaveFilePanelInProject("Save Image", defaultFilename, "png", "", Application.dataPath + "/Renderings");
-
-            if (!string.IsNullOrEmpty(path))
+            string filename = defaultFilename + "." + fileExtension;
+            if(Directory.GetFiles(defaultDirectory, filename).Length == 1)
             {
-                File.WriteAllBytes(path, image.EncodeToPNG());
+                for(int i = 1; ; i++)
+                {
+                    filename = defaultFilename + "_" + i + "." + fileExtension;
+                    if(Directory.GetFiles(defaultDirectory, filename).Length == 0)
+                    {
+                        break;
+                    }
+                }
             }
+
+            string filePath = EditorUtility.SaveFilePanelInProject("Save Image", filename, fileExtension, "", defaultDirectory);
+
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                File.WriteAllBytes(filePath, image.EncodeToPNG());
+                SaveMetadata(filePath);
+            }
+        }
+
+        public void SaveMetadata(string imageFilePath)
+        {
+            string metadata = "";
+
+            metadata += "Scene: " + sceneFilename + "\n";
+
+            metadata += "Time: " + (endTime - startTime).ToString("n2") + "s";
+            metadata += " ";
+            metadata += "(" + (GetFinishedPercentage() * 100).ToString("n2") + "%)" + "\n";
+            metadata += "Rays: " + rayCount + "\n";
+            metadata += "Recursion Depth: " + recursionDepth + "\n";
+
+            if (hasLighting)
+            {
+                metadata += "Shadows: " + Shadow.Types[shadowType] + "\n";
+                if (Shadow.Types[shadowType] == Shadow.Soft)
+                {
+                    metadata += "Shadow Rays: " + shadowRays + "\n";
+                }
+            }
+
+            if (AntiAliasing.Types[antiAliasingType] != AntiAliasing.None)
+            {
+                metadata += "Anti-Aliasing: " + AntiAliasing.Types[antiAliasingType] + " " + antiAliasing + "x\n";
+
+                if (AntiAliasing.Types[antiAliasingType] == AntiAliasing.Adaptive)
+                {
+                    metadata += "AA Threshold: " + AntiAliasing.PixelThreshold + "\n";
+                }
+            }
+
+            if (depthOfField)
+            {
+                metadata += "Focal Distance: " + dofFocalDistance + "\n";
+                metadata += "Aperture: " + dofAperture + "\n";
+                metadata += "Depth of Field Rays: " + dofRays + "\n";
+            }
+
+            if (Accelerator.Types[acceleratorType] != Accelerator.None)
+            {
+                metadata += "Acceleration Structure: " + Accelerator.Types[acceleratorType] + "\n";
+                if (Accelerator.Types[acceleratorType] == Accelerator.UniformGrid)
+                {
+                    metadata += "Grid Multiplier: " + gridMultiplier + "\n";
+                }
+            }
+
+            string metadataPath = Path.ChangeExtension(imageFilePath, "txt");
+            File.WriteAllBytes(metadataPath, Encoding.ASCII.GetBytes(metadata));
         }
 
         public float GetFinishedPercentage()
@@ -769,9 +834,9 @@ namespace Raytracing
                 GUI.enabled = !raytracer.isRunning;
 
                 string loadButtonText = "Load scene";
-                if(!string.IsNullOrEmpty(raytracer.filename))
+                if(!string.IsNullOrEmpty(raytracer.sceneFilename))
                 {
-                    loadButtonText += " (" + raytracer.filename + ")";
+                    loadButtonText += " (" + raytracer.sceneFilename + ")";
                 }
                 if (GUILayout.Button(loadButtonText))
                 {
