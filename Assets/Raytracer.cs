@@ -761,8 +761,10 @@ namespace Raytracing
             raytracer.refreshTime = EditorGUILayout.Slider("Refresh Time", raytracer.refreshTime, 0, 1);
 
             GUI.enabled = !raytracer.isRunning;
-            int[] pixelSizeValues = new int[] { 1, 2, 4, 8, 16 };
-            
+
+            EditorGUILayout.Space();
+            raytracer.recursionDepth = EditorGUILayout.IntSlider("Recursion Depth", raytracer.recursionDepth, 0, 4);
+
             EditorGUILayout.Space();
             raytracer.hasLighting = EditorGUILayout.Toggle("Lights", raytracer.hasLighting);
             if(raytracer.hasLighting)
@@ -773,9 +775,6 @@ namespace Raytracing
                     raytracer.shadowRays = SnappingIntSlider("Shadow Rays", raytracer.shadowRays, new int[] { 16, 32, 64, 128, 256, 512 });
                 }
             }
-
-            EditorGUILayout.Space();
-            raytracer.recursionDepth = EditorGUILayout.IntSlider("Recursion Depth", raytracer.recursionDepth, 0, 4);
 
             EditorGUILayout.Space();
             raytracer.antiAliasingType = EditorGUILayout.Popup("Anti-Aliasing", raytracer.antiAliasingType, AntiAliasing.Types);
@@ -873,7 +872,7 @@ namespace Raytracing
 
                 statsString += "Time: " + time.ToString("n2") + "s";
 
-                if (raytracer.scene.objects.Count > 0)
+                if (time > 0)
                 {
                     statsString += " ";
                     statsString += "(" + (raytracer.GetFinishedPercentage() * 100).ToString("n2") + "%)";
@@ -886,7 +885,7 @@ namespace Raytracing
 
                 EditorGUILayout.HelpBox(statsString, MessageType.Info);
 
-                GUI.enabled = raytracer.isCompleted;
+                GUI.enabled = !raytracer.isRunning && time > 0;
                 if (GUILayout.Button("Save image"))
                 {
                     raytracer.SaveImage();
