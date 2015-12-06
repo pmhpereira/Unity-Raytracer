@@ -90,7 +90,7 @@ namespace Raytracing
         public int acceleratorType;
         public int antiAliasingType;
 
-        public static int gridMultiplier;
+        public static float gridMultiplier;
 
         public string filename;
 
@@ -123,6 +123,9 @@ namespace Raytracing
 
             switch(accelerationStructure)
             {
+                case Accelerator.UniformGrid:
+                    accelerator = new UniformGrid(ref scene.objects);
+                    break;
                 case Accelerator.None:
                 default:
                     accelerator = new Accelerator(ref scene.objects);
@@ -714,6 +717,10 @@ namespace Raytracing
 
             EditorGUILayout.Space();
             raytracer.acceleratorType = EditorGUILayout.Popup("Acceleration Structure", raytracer.acceleratorType, Accelerator.Types);
+            if(Accelerator.Types[raytracer.acceleratorType] == Accelerator.UniformGrid)
+            {
+                Raytracer.gridMultiplier = EditorGUILayout.Slider("Grid Multiplier", Raytracer.gridMultiplier, 0, 4);
+            }
 
             EditorGUILayout.Space();
             raytracer.overrideSettings = EditorGUILayout.Toggle("Override Settings", raytracer.overrideSettings);
