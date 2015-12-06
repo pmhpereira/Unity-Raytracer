@@ -38,6 +38,8 @@ namespace Raytracing
 
         public override bool Hit(Ray ray, ref RayHit hitInfo)
         {
+            bool hit = false;
+
             for (int i = 0; i <= vertices.Length - 3; i++)
             {
                 Vector3[] triangle = new Vector3[3];
@@ -47,11 +49,11 @@ namespace Raytracing
 
                 if (HitTriangle(ray, triangle, ref hitInfo))
                 {
-                    return true;
+                    hit = true;
                 }
             }
 
-            return false;
+            return hit;
         }
 
         private void SetupVariables()
