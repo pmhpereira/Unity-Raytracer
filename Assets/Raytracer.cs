@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Collections;
 using System;
+using System.Text;
 
 namespace Raytracing
 {
@@ -92,7 +93,7 @@ namespace Raytracing
 
         public static float gridMultiplier;
 
-        public string filename;
+        public string sceneFilename;
 
         public bool hasLighting;
 
@@ -308,7 +309,10 @@ namespace Raytracing
             int y = pixel / factorWidth;
 
             pixels[pixel] = TraceRay(x, y);
-            screenRayCount++;
+            lock(this)
+            {
+                screenRayCount++;
+            }
         }
 
         Color TraceRaySimple(float x, float y)
@@ -592,7 +596,7 @@ namespace Raytracing
 
         IEnumerator Refresh()
         {
-            if(pixels != null)
+            if(image != null && pixels != null)
             {
                 image.SetPixels(pixels);
                 image.Apply();
@@ -612,7 +616,7 @@ namespace Raytracing
 
         void OnGUI()
         {
-            if (raytracerThread != null)
+            if (image != null && raytracerThread != null)
             {
                 GUI.DrawTexture(new Rect(0, 0, width, height), image);
             }
@@ -626,30 +630,110 @@ namespace Raytracing
 
             if (!string.IsNullOrEmpty(path))
             {
-                scene = new Scene();
+                ResetScene();
+
                 scene.Load(path);
-                filename = Path.GetFileName(path);
+                sceneFilename = Path.GetFileName(path);
             }
+        }
+
+        public void ResetScene()
+        {
+            scene = new Scene();
+
+            startTime = endTime = 0;
+            rayCount = screenRayCount = maxScreenRayCount = 0;
+
+            image = null;
         }
 
         public void SaveImage()
         {
-            string defaultFilename = filename.Split('.')[0];
-            defaultFilename += "&depth=" + recursionDepth;
-            defaultFilename += "&resolution=" + factorWidth + "x" + factorHeight;
-            defaultFilename += "&aliasing=" + antiAliasing;
+            string defaultDirectory = Application.dataPath + "/Renderings";
+            string defaultFilename = sceneFilename.Split('.')[0];
+            string fileExtension = "png";
 
-            string path = EditorUtility.SaveFilePanelInProject("Save Image", defaultFilename, "png", "", Application.dataPath + "/Renderings");
-
-            if (!string.IsNullOrEmpty(path))
+            string filename = defaultFilename + "." + fileExtension;
+            if(Directory.GetFiles(defaultDirectory, filename).Length == 1)
             {
-                File.WriteAllBytes(path, image.EncodeToPNG());
+                for(int i = 1; ; i++)
+                {
+                    filename = defaultFilename + "_" + i + "." + fileExtension;
+                    if(Directory.GetFiles(defaultDirectory, filename).Length == 0)
+                    {
+                        break;
+                    }
+                }
             }
+
+            string filePath = EditorUtility.SaveFilePanelInProject("Save Image", filename, fileExtension, "", defaultDirectory);
+
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                File.WriteAllBytes(filePath, image.EncodeToPNG());
+                SaveMetadata(filePath);
+            }
+        }
+
+        public void SaveMetadata(string imageFilePath)
+        {
+            string metadata = "";
+
+            metadata += "Scene: " + sceneFilename + "\n";
+
+            metadata += "Time: " + (endTime - startTime).ToString("n2") + "s";
+            metadata += " ";
+            metadata += "(" + (GetFinishedPercentage() * 100).ToString("n2") + "%)" + "\n";
+            metadata += "Rays: " + rayCount + "\n";
+            metadata += "Recursion Depth: " + recursionDepth + "\n";
+
+            if (hasLighting)
+            {
+                metadata += "Shadows: " + Shadow.Types[shadowType] + "\n";
+                if (Shadow.Types[shadowType] == Shadow.Soft)
+                {
+                    metadata += "Shadow Rays: " + shadowRays + "\n";
+                }
+            }
+
+            if (AntiAliasing.Types[antiAliasingType] != AntiAliasing.None)
+            {
+                metadata += "Anti-Aliasing: " + AntiAliasing.Types[antiAliasingType] + " " + antiAliasing + "x\n";
+
+                if (AntiAliasing.Types[antiAliasingType] == AntiAliasing.Adaptive)
+                {
+                    metadata += "AA Threshold: " + AntiAliasing.PixelThreshold + "\n";
+                }
+            }
+
+            if (depthOfField)
+            {
+                metadata += "Focal Distance: " + dofFocalDistance + "\n";
+                metadata += "Aperture: " + dofAperture + "\n";
+                metadata += "Depth of Field Rays: " + dofRays + "\n";
+            }
+
+            if (Accelerator.Types[acceleratorType] != Accelerator.None)
+            {
+                metadata += "Acceleration Structure: " + Accelerator.Types[acceleratorType] + "\n";
+                if (Accelerator.Types[acceleratorType] == Accelerator.UniformGrid)
+                {
+                    metadata += "Grid Multiplier: " + gridMultiplier + "\n";
+                }
+            }
+
+            string metadataPath = Path.ChangeExtension(imageFilePath, "txt");
+            File.WriteAllBytes(metadataPath, Encoding.ASCII.GetBytes(metadata));
         }
 
         public float GetFinishedPercentage()
         {
-            return (float)screenRayCount / maxScreenRayCount;
+            if(maxScreenRayCount > 0)
+            {
+                return (float)screenRayCount / maxScreenRayCount;
+            }
+
+            return 0;
         }
 
         public void StopRayTracer()
@@ -658,7 +742,7 @@ namespace Raytracing
             runThread = false;
 
             isRunning = false;
-            isCompleted = true;
+            isCompleted = (screenRayCount == maxScreenRayCount);
         }
 
         void OnDestroy()
@@ -677,8 +761,10 @@ namespace Raytracing
             raytracer.refreshTime = EditorGUILayout.Slider("Refresh Time", raytracer.refreshTime, 0, 1);
 
             GUI.enabled = !raytracer.isRunning;
-            int[] pixelSizeValues = new int[] { 1, 2, 4, 8, 16 };
-            
+
+            EditorGUILayout.Space();
+            raytracer.recursionDepth = EditorGUILayout.IntSlider("Recursion Depth", raytracer.recursionDepth, 0, 4);
+
             EditorGUILayout.Space();
             raytracer.hasLighting = EditorGUILayout.Toggle("Lights", raytracer.hasLighting);
             if(raytracer.hasLighting)
@@ -689,9 +775,6 @@ namespace Raytracing
                     raytracer.shadowRays = SnappingIntSlider("Shadow Rays", raytracer.shadowRays, new int[] { 16, 32, 64, 128, 256, 512 });
                 }
             }
-
-            EditorGUILayout.Space();
-            raytracer.recursionDepth = EditorGUILayout.IntSlider("Recursion Depth", raytracer.recursionDepth, 0, 4);
 
             EditorGUILayout.Space();
             raytracer.antiAliasingType = EditorGUILayout.Popup("Anti-Aliasing", raytracer.antiAliasingType, AntiAliasing.Types);
@@ -750,9 +833,9 @@ namespace Raytracing
                 GUI.enabled = !raytracer.isRunning;
 
                 string loadButtonText = "Load scene";
-                if(!string.IsNullOrEmpty(raytracer.filename))
+                if(!string.IsNullOrEmpty(raytracer.sceneFilename))
                 {
-                    loadButtonText += " (" + raytracer.filename + ")";
+                    loadButtonText += " (" + raytracer.sceneFilename + ")";
                 }
                 if (GUILayout.Button(loadButtonText))
                 {
@@ -789,7 +872,7 @@ namespace Raytracing
 
                 statsString += "Time: " + time.ToString("n2") + "s";
 
-                if (raytracer.isRunning)
+                if (time > 0)
                 {
                     statsString += " ";
                     statsString += "(" + (raytracer.GetFinishedPercentage() * 100).ToString("n2") + "%)";
@@ -802,7 +885,7 @@ namespace Raytracing
 
                 EditorGUILayout.HelpBox(statsString, MessageType.Info);
 
-                GUI.enabled = raytracer.isCompleted;
+                GUI.enabled = !raytracer.isRunning && time > 0;
                 if (GUILayout.Button("Save image"))
                 {
                     raytracer.SaveImage();
