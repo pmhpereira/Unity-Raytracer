@@ -5,6 +5,7 @@ using System.Threading;
 using System.Collections;
 using System;
 using System.Text;
+using System.Collections.Generic;
 
 namespace Raytracing
 {
@@ -204,10 +205,18 @@ namespace Raytracing
         }
 
         ManualResetEvent[] waitHandles = null;
+        List<int> pixelIndices = null;
 
         void Raytrace()
         {
             Random = new ThreadedRandom();
+
+            pixelIndices = new List<int>(pixels.Length);
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixelIndices.Add(i);
+            }
+            pixelIndices.Shuffle();
 
             if (threadCount > 1)
             {
@@ -263,37 +272,24 @@ namespace Raytracing
 
         void RaytraceWorker(object data = null)
         {
-            int _xMin = xMin / pixelSize;
-            int _yMin = Mathf.Max(0, yMin) / pixelSize;
-            int _xMax = Mathf.Min(width, xMax) / pixelSize;
-            int _yMax = Mathf.Min(height, yMax) / pixelSize;
-
             if (data != null)
             {
                 ThreadData tData = (ThreadData)data;
+                int pixelMin = tData.pixelMin;
+                int pixelMax = tData.pixelMax;
 
-                for (int p = tData.pixelMin; p < tData.pixelMax; p++)
+                for (int i = pixelMin; i < pixelMax; i++)
                 {
-                    int x = p % factorWidth;
-                    int y = p / factorWidth;
-
-                    if(x >= _xMin && x <= _xMax && y >= _yMin && y <= _yMax)
-                    {
-                        TracePixel(p);
-                    }
+                    TracePixel(pixelIndices[i]);
                 }
 
                 waitHandles[tData.id].Set();
             }
             else
             {
-
-                for (int y = (int)_yMin; y < _yMax; y++)
+                for(int i = 0; i < pixels.Length; i++)
                 {
-                    for (int x = (int)_xMin; x < _xMax; x++)
-                    {
-                        TracePixel(x + y * factorWidth);
-                    }
+                    TracePixel(pixelIndices[i]);
                 }
             }
         }
@@ -305,13 +301,21 @@ namespace Raytracing
                 return;
             }
 
+            int _xMin = xMin / pixelSize;
+            int _yMin = Mathf.Max(0, yMin) / pixelSize;
+            int _xMax = Mathf.Min(width, xMax) / pixelSize;
+            int _yMax = Mathf.Min(height, yMax) / pixelSize;
+
             int x = pixel % factorWidth;
             int y = pixel / factorWidth;
 
-            pixels[pixel] = TraceRay(x, y);
-            lock(this)
+            if (x >= _xMin && x < _xMax && y >= _yMin && y < _yMax)
             {
-                screenRayCount++;
+                pixels[pixel] = TraceRay(x, y);
+                lock(this)
+                {
+                    screenRayCount++;
+                }
             }
         }
 
@@ -522,8 +526,6 @@ namespace Raytracing
 
                         if(sin > 0)
                         {
-                            screenRayCount++;
-
                             float cosT = Mathf.Sqrt(1 - sin);
 
                             Vector3 refractionDirection = (ray.direction * n + hitInfo.normal * (n * cosI - cosT)).normalized;

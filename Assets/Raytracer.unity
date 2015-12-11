@@ -188,7 +188,7 @@ MonoBehaviour:
   shadowRays: 256
   acceleratorType: 0
   antiAliasingType: 2
-  filename: 
+  sceneFilename: 
   hasLighting: 1
   depthOfField: 0
   dofRays: 16
